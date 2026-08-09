@@ -1,14 +1,20 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import serverless from 'serverless-http';
-import { NICHES } from './src/data/niches.js';
+import { NICHES } from './src/data/niches';
 
 const app = express();
 app.use(express.json());
 
 const PORT = 3000;
+
+const isServerless = Boolean(
+  process.env.NETLIFY ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.LAMBDA_TASK_ROOT ||
+  process.env.VERCEL
+);
 
 // Shared Gemini AI client setup
 const getGeminiClient = () => {
@@ -80,7 +86,7 @@ function scoreEmailPriority(email: string): number {
 // --- API ROUTES ---
 
 // 1. API Health Check
-app.get('/api/health', (req: Request, res: Response) => {
+app.get(['/api/health', '/health'], (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
@@ -89,7 +95,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 // 2. Lead Scraping Pipeline (Geoapify + Fallback)
-app.post('/api/leads/search', async (req: Request, res: Response) => {
+app.post(['/api/leads/search', '/leads/search'], async (req: Request, res: Response) => {
   try {
     const { nicheId, cityName, stateName, limit = 10 } = req.body;
 
@@ -301,7 +307,7 @@ app.post('/api/leads/search', async (req: Request, res: Response) => {
 });
 
 // 3. Contact Email Extraction Endpoint
-app.post('/api/leads/extract-emails', async (req: Request, res: Response) => {
+app.post(['/api/leads/extract-emails', '/leads/extract-emails'], async (req: Request, res: Response) => {
   try {
     const { website, leadName } = req.body;
 
@@ -407,7 +413,7 @@ app.post('/api/leads/extract-emails', async (req: Request, res: Response) => {
 });
 
 // 4. Website Audit & Cold Email Copywriting (Gemini Vision + Text with Retry & Fallback)
-app.post('/api/leads/audit-and-draft', async (req: Request, res: Response) => {
+app.post(['/api/leads/audit-and-draft', '/leads/audit-and-draft'], async (req: Request, res: Response) => {
   try {
     const { lead, customTone = 'Direct & Helpful' } = req.body;
 
@@ -629,31 +635,31 @@ ProspectPilot`,
   }
 });
 
-// Setup Vite Dev Middleware in development, static handling in production
-async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
+// Setup Vite Dev Middleware in development, static handling in production (only when running standalone server)
+if (!isServerless) {
+  async function startServer() {
+    if (process.env.NODE_ENV !== 'production') {
+      const { createServer: createViteServer } = await import('vite');
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
 
-  // Serverless Readiness & Conditional Listen
-  if (!process.env.LAMBDA_TASK_ROOT && !process.env.VERCEL) {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`ProspectPilot server listening on http://0.0.0.0:${PORT}`);
     });
   }
-}
 
-startServer();
+  startServer();
+}
 
 // Export for serverless wrap compatibility
 export default app;
