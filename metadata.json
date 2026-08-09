@@ -1,0 +1,6 @@
+{
+  "name": "ProspectPilot",
+  "description": "Hyper-personalized cold outreach engine for local business lead scraping, AI website audits, email extraction, and cold outreach.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
