@@ -78,6 +78,41 @@ export const LeadCard: React.FC<LeadCardProps> = ({
     onUpdateEmail(lead.id, val);
   };
 
+  const getMailtoUrl = () => {
+    const recipient = editableEmail || lead.foundEmail || lead.manualEmail || '';
+    const subject = lead.emailDraft?.subject || `Quick question regarding ${lead.name}`;
+    const body = lead.emailDraft?.body || '';
+    return `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const getGmailUrl = () => {
+    const recipient = editableEmail || lead.foundEmail || lead.manualEmail || '';
+    const subject = lead.emailDraft?.subject || `Quick question regarding ${lead.name}`;
+    const body = lead.emailDraft?.body || '';
+    return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipient)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const getOutlookUrl = () => {
+    const recipient = editableEmail || lead.foundEmail || lead.manualEmail || '';
+    const subject = lead.emailDraft?.subject || `Quick question regarding ${lead.name}`;
+    const body = lead.emailDraft?.body || '';
+    return `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(recipient)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const handleSendEmail = (type: 'mailto' | 'gmail' | 'outlook') => {
+    const recipient = editableEmail || lead.foundEmail || lead.manualEmail;
+    if (!recipient) {
+      alert('Please enter or select a recipient email address first.');
+      return;
+    }
+    let targetUrl = getMailtoUrl();
+    if (type === 'gmail') targetUrl = getGmailUrl();
+    if (type === 'outlook') targetUrl = getOutlookUrl();
+
+    window.open(targetUrl, '_blank');
+    onMarkContacted(lead.id);
+  };
+
   const handleCopy = (text: string, type: 'email' | 'subject' | 'body') => {
     navigator.clipboard.writeText(text);
     if (type === 'email') {
@@ -257,8 +292,37 @@ export const LeadCard: React.FC<LeadCardProps> = ({
             )}
           </div>
 
+          {/* Direct Send Email Action Buttons in Left Column */}
+          {editableEmail && (
+            <div className="pt-1 flex flex-wrap items-center gap-1.5">
+              <button
+                onClick={() => handleSendEmail('mailto')}
+                className="flex-1 py-1.5 px-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold rounded-lg shadow transition-all flex items-center justify-center gap-1.5"
+                title="Send via default mail application (Apple Mail, Outlook, etc.)"
+              >
+                <Send className="w-3.5 h-3.5" /> Send Email
+              </button>
+              <button
+                onClick={() => handleSendEmail('gmail')}
+                className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-medium rounded-lg transition-colors flex items-center gap-1"
+                title="Compose directly in Gmail web"
+              >
+                <span>Gmail</span>
+                <ExternalLink className="w-3 h-3 text-slate-400" />
+              </button>
+              <button
+                onClick={() => handleSendEmail('outlook')}
+                className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-medium rounded-lg transition-colors flex items-center gap-1"
+                title="Compose directly in Outlook web"
+              >
+                <span>Outlook</span>
+                <ExternalLink className="w-3 h-3 text-slate-400" />
+              </button>
+            </div>
+          )}
+
           {lead.allFoundEmails && lead.allFoundEmails.length > 1 && (
-            <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-1.5 pt-1">
+            <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-800/80">
               <span>Other candidates:</span>
               {lead.allFoundEmails.slice(1, 3).map((e, idx) => (
                 <button
@@ -302,11 +366,21 @@ export const LeadCard: React.FC<LeadCardProps> = ({
               </button>
             </div>
 
-            {lead.status === 'ready' && (
-              <span className="text-[11px] font-medium text-emerald-400 flex items-center gap-1">
-                <CheckCircle className="w-3.5 h-3.5" /> Audit & Draft Ready
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {lead.status === 'contacted' ? (
+                <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-950/80 border border-emerald-500/40 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                  <CheckCircle className="w-3.5 h-3.5" /> Email Sent
+                </span>
+              ) : (
+                <button
+                  onClick={() => handleSendEmail('mailto')}
+                  className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs rounded-lg shadow-md transition-all flex items-center gap-1.5"
+                  title="Send cold outreach email"
+                >
+                  <Send className="w-3.5 h-3.5" /> Send Email
+                </button>
+              )}
+            </div>
           </div>
 
           {/* TAB 1: AUDIT DETAIL */}
@@ -414,6 +488,47 @@ export const LeadCard: React.FC<LeadCardProps> = ({
                     </div>
                   </div>
 
+                  {/* Send Email Outreach Dispatch Options */}
+                  <div className="p-3 bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/30 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-indigo-300">
+                      <span className="flex items-center gap-1.5">
+                        <Send className="w-3.5 h-3.5 text-indigo-400" /> Dispatch Cold Outreach
+                      </span>
+                      {lead.status === 'contacted' ? (
+                        <span className="text-emerald-400 text-[11px] font-medium flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" /> Marked as Sent
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-[11px]">
+                          Recipient: <span className="text-white font-mono">{editableEmail || 'Not set'}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                      <button
+                        onClick={() => handleSendEmail('mailto')}
+                        className="py-2 px-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <Send className="w-3.5 h-3.5" /> Mail App (Default)
+                      </button>
+
+                      <button
+                        onClick={() => handleSendEmail('gmail')}
+                        className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 font-medium text-xs rounded-lg transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-rose-400" /> Send via Gmail
+                      </button>
+
+                      <button
+                        onClick={() => handleSendEmail('outlook')}
+                        className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 font-medium text-xs rounded-lg transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-blue-400" /> Send via Outlook
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Tone / Angle Regenerate options */}
                   <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
                     <div className="flex items-center gap-1.5 text-slate-400">
@@ -437,9 +552,14 @@ export const LeadCard: React.FC<LeadCardProps> = ({
 
                     <button
                       onClick={() => onMarkContacted(lead.id)}
-                      className="px-3 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 ${
+                        lead.status === 'contacted'
+                          ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/40'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                      }`}
                     >
-                      <Send className="w-3 h-3" /> Mark Sent
+                      <CheckCircle className="w-3 h-3 text-emerald-400" />
+                      <span>{lead.status === 'contacted' ? 'Marked Sent' : 'Mark as Sent'}</span>
                     </button>
                   </div>
                 </>
